@@ -71,21 +71,13 @@ function create-dataset-puts ($result)
         # pointRadius = 2
 
         fill = $false
+
+        # pointRadius = $result.optionChain.result[0].options[0].puts | ForEach-Object { [math]::Min($_.oi_pct * 100, 10) }
+
+        pointRadius = $result.optionChain.result[0].options[0].puts | ForEach-Object { [math]::Min($_.oi_pct * 100, 5) }
     }
 }
 # ----------------------------------------------------------------------
-
-# $chains = chart-puts     SPY 2023-05-19, 2023-06-16, 2023-07-21, 2024-03-15, 2024-12-20
-
-# $symbol = 'SPY'
-
-# $expirations = '2023-05-19 2023-06-16 2023-07-21 2024-03-15 2024-12-20' -split ' '
-
-# $date = $expirations[0]
-
-# $chain = get-options-chain $symbol $date
-
-
 function chart-puts ($symbol, $expirations)
 {
     $chains = foreach ($date in $expirations)
@@ -175,7 +167,9 @@ function create-dataset-puts-chg ($result)
 
         # pointRadius = $result.optionChain.result[0].options[0].puts | ForEach-Object { [math]::Min($_.vol_pct * 1000, 10) }
 
-        pointRadius = $result.optionChain.result[0].options[0].puts | ForEach-Object { [math]::Min($_.oi_pct * 100, 10) }
+        # pointRadius = $result.optionChain.result[0].options[0].puts | ForEach-Object { [math]::Min($_.oi_pct * 100, 10) }
+
+        pointRadius = $result.optionChain.result[0].options[0].puts | ForEach-Object { [math]::Min($_.oi_pct * 100, 5) }
     }
 }
 # ----------------------------------------------------------------------

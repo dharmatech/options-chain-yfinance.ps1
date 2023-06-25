@@ -116,21 +116,28 @@ function expirationDate-to-date ()
 }
 
 
-function chart-term-structure ($symbol, $expirations)
+function chart-term-structure ($symbol, $expirations, $chains)
 {
-    $chains = foreach ($date in $expirations)
+    if ($chains -eq $null)
     {
-        get-options-chain $symbol $date
-    }
-    
-    $chains = foreach ($chain in $chains)
-    {
-        if ($chain.optionChain.result[0].options[0].calls.Count -gt 0)
+        $chains = foreach ($date in $expirations)
         {
-            $chain
+            get-options-chain $symbol $date
+        }
+        
+        $chains = foreach ($chain in $chains)
+        {
+            if ($chain.optionChain.result[0].options[0].calls.Count -gt 0)
+            {
+                $chain
+            }
         }
     }
-
+    else
+    {
+        $symbol = $chains[0].optionChain.result[0].underlyingSymbol
+    }
+    
     $chains
 
     $regularMarketPrice = $chains[0].optionChain.result[0].quote.regularMarketPrice
@@ -140,20 +147,41 @@ function chart-term-structure ($symbol, $expirations)
         $chain[0].optionChain.result[0].options[0].calls | ? strike -GE $regularMarketPrice | Select-Object -First 1
     }
 
+    # $atm_calls | Select-Object contractSymbol, strike, impliedVolatility
+
     $atm_puts = foreach ($chain in $chains)
     {
         $chain[0].optionChain.result[0].options[0].puts | ? strike -GE $regularMarketPrice | Select-Object -First 1
     }    
 
+    # $otm_calls = foreach ($chain in $chains)
+    # {
+    #     $chain[0].optionChain.result[0].options[0].calls[-1]
+    # }
+
+    # $otm_puts = foreach ($chain in $chains)
+    # {
+    #     $chain[0].optionChain.result[0].options[0].puts[0]
+    # }
+
+
+    $otm_call_strike = $chains | % { $chain = $_; $chain[0].optionChain.result[0].options[0].calls[-1].strike } | Measure-Object -Minimum | % Minimum
+
+    # $chains | % { $chain = $_; $chain[0].optionChain.result[0].options[0].calls | ? strike -EQ $otm_call_strike | Select-Object contractSymbol, impliedVolatility }
+
     $otm_calls = foreach ($chain in $chains)
     {
-        $chain[0].optionChain.result[0].options[0].calls[-1]
+        $chain[0].optionChain.result[0].options[0].calls | ? strike -EQ $otm_call_strike
     }
+
+    # $otm_calls | Select-Object contractSymbol, strike, impliedVolatility
+
+    $otm_put_strike = $chains | % { $chain = $_; $chain[0].optionChain.result[0].options[0].puts[0].strike } | Measure-Object -Maximum | % Maximum
 
     $otm_puts = foreach ($chain in $chains)
     {
-        $chain[0].optionChain.result[0].options[0].puts[0]
-    }
+        $chain[0].optionChain.result[0].options[0].puts | ? strike -EQ $otm_put_strike
+    }    
 
     # ----------------------------------------------------------------------
     $json = @{
@@ -206,3 +234,6 @@ $result_spy = .\term-structure-yfinance.ps1 SPY '2023-06-26', '2023-06-30', '202
 
 
 $result_spy = chart-term-structure SPY '2023-06-23', '2023-06-30', '2023-07-07', '2023-07-14', '2023-07-21', '2023-07-28', '2023-08-04', '2023-08-18'
+
+
+chart-term-structure -chains $result_spy

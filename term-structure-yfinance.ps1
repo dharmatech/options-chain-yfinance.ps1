@@ -141,19 +141,24 @@ function chart-term-structure ($symbol, $expirations, $chains)
     $chains
 
     $regularMarketPrice = $chains[0].optionChain.result[0].quote.regularMarketPrice
+    
+    $atm_strike = $chain[0].optionChain.result[0].options[0].calls | Select-Object strike, @{ Label = 'dist'; Expression = { [math]::Abs($_.strike - $regularMarketPrice) } } | Sort-Object dist | Select-Object -First 1 | % strike
         
+    # ----------------------------------------------------------------------
     $atm_calls = foreach ($chain in $chains)
     {
-        $chain[0].optionChain.result[0].options[0].calls | ? strike -GE $regularMarketPrice | Select-Object -First 1
+        # $chain[0].optionChain.result[0].options[0].calls | ? strike -GE $regularMarketPrice | Select-Object -First 1
+
+        $chain[0].optionChain.result[0].options[0].calls | ? strike -EQ $atm_strike | Select-Object -First 1
     }
 
     # $atm_calls | Select-Object contractSymbol, strike, impliedVolatility
 
     $atm_puts = foreach ($chain in $chains)
     {
-        $chain[0].optionChain.result[0].options[0].puts | ? strike -GE $regularMarketPrice | Select-Object -First 1
-    }    
-
+        $chain[0].optionChain.result[0].options[0].puts | ? strike -EQ $atm_strike | Select-Object -First 1
+    }
+    # ----------------------------------------------------------------------
     # $otm_calls = foreach ($chain in $chains)
     # {
     #     $chain[0].optionChain.result[0].options[0].calls[-1]
@@ -166,7 +171,7 @@ function chart-term-structure ($symbol, $expirations, $chains)
 
 
     $otm_call_strike = $chains | % { $chain = $_; $chain[0].optionChain.result[0].options[0].calls[-1].strike } | Measure-Object -Minimum | % Minimum
-
+   
     # $chains | % { $chain = $_; $chain[0].optionChain.result[0].options[0].calls | ? strike -EQ $otm_call_strike | Select-Object contractSymbol, impliedVolatility }
 
     $otm_calls = foreach ($chain in $chains)
@@ -182,6 +187,70 @@ function chart-term-structure ($symbol, $expirations, $chains)
     {
         $chain[0].optionChain.result[0].options[0].puts | ? strike -EQ $otm_put_strike
     }    
+    # ----------------------------------------------------------------------
+
+    $partial_otm_call_strike = [math]::Round(($otm_call_strike - $atm_strike)/5 + $atm_strike)
+
+    $partial_otm_calls = $chains | % {
+        $chain = $_
+        
+        $chain[0].optionChain.result[0].options[0].calls | ? strike -EQ $partial_otm_call_strike
+    }
+
+    $partial_otm_put_strike = [math]::Round($atm_strike - ($atm_strike - $otm_put_strike)/5)
+
+    $partial_otm_puts = $chains | % {
+        $chain = $_
+        
+        $chain[0].optionChain.result[0].options[0].puts | ? strike -EQ $partial_otm_put_strike
+    }    
+
+    # ----------------------------------------------------------------------
+
+    # $partial_otm_call = $chains | % {
+    #     $chain = $_
+
+    #     $otm = $chain[0].optionChain.result[0].options[0].calls[-1]
+
+    #     $strike = [math]::Round(($otm.strike - $atm_strike) / 5 + $atm_strike)
+
+    #     $chain[0].optionChain.result[0].options[0].calls | ? strike -EQ $strike
+    # }
+
+    # $partial_otm_put = $chains | % {
+    #     $chain = $_
+
+    #     $otm = $chain[0].optionChain.result[0].options[0].puts[0]
+
+    #     $strike = [math]::Round($atm_strike - ($atm_strike - $otm.strike) / 5)
+
+    #     $chain[0].optionChain.result[0].options[0].puts | ? strike -EQ $strike
+    # }    
+
+    # ----------------------------------------------------------------------
+
+
+
+
+    
+
+    # $chains | % { 
+    #     $chain = $_
+        
+    #     $otm_strike = $chain[0].optionChain.result[0].options[0].calls[-1].strike
+
+
+    # }
+
+
+    # $chains | % { $chain = $_; $chain[0].optionChain.result[0].calls }
+
+    # $chains[0].optionChain.result[0].options[0].calls | Sort-Object strike -Descending | ft *
+
+    # $chains[0].optionChain.result[0].options[0].calls[0]
+
+    
+
 
     # ----------------------------------------------------------------------
     $json = @{
@@ -196,10 +265,12 @@ function chart-term-structure ($symbol, $expirations, $chains)
                 }
 
                 datasets = @(
-                    @{ label = 'ATM Call'; data = $atm_calls | % { $_.impliedVolatility.ToString('N4') }; fill = $false }
-                    @{ label = 'ATM Put' ; data = $atm_puts  | % { $_.impliedVolatility.ToString('N4') }; fill = $false }
-                    @{ label = 'OTM Call'; data = $otm_calls | % { $_.impliedVolatility.ToString('N4') }; fill = $false }
-                    @{ label = 'OTM Put' ; data = $otm_puts  | % { $_.impliedVolatility.ToString('N4') }; fill = $false }
+                    @{ label = 'ATM Call';                           data = $atm_calls | % { $_.impliedVolatility.ToString('N4') }; fill = $false }
+                    @{ label = 'ATM Put' ;                           data = $atm_puts  | % { $_.impliedVolatility.ToString('N4') }; fill = $false }
+                    @{ label = ('OTM Call {0}' -f $otm_call_strike); data = $otm_calls | % { $_.impliedVolatility.ToString('N4') }; fill = $false }
+                    @{ label = ('OTM Put {0}'  -f $otm_put_strike ); data = $otm_puts  | % { $_.impliedVolatility.ToString('N4') }; fill = $false }
+                    @{ label = ('OTM Call {0}' -f $partial_otm_call_strike); data = $partial_otm_calls | % { $_.impliedVolatility.ToString('N4') }; fill = $false }
+                    @{ label = ('OTM Put {0}'  -f $partial_otm_put_strike) ; data = $partial_otm_puts  | % { $_.impliedVolatility.ToString('N4') }; fill = $false }                    
                 )
             }
             options = @{
@@ -229,11 +300,15 @@ $result = get-options-chain SPY '2023-08-18'
 
 
 
-$result_spy = .\term-structure-yfinance.ps1 SPY '2023-06-26', '2023-06-30', '2023-07-07', '2023-07-14', '2023-07-21', '2023-07-28', '2023-08-04', '2023-08-18'
+$chains_spy = .\term-structure-yfinance.ps1 SPY '2023-06-26', '2023-06-30', '2023-07-07', '2023-07-14', '2023-07-21', '2023-07-28', '2023-08-04', '2023-08-18'
 
 
 
-$result_spy = chart-term-structure SPY '2023-06-23', '2023-06-30', '2023-07-07', '2023-07-14', '2023-07-21', '2023-07-28', '2023-08-04', '2023-08-18'
+$chains_spy = chart-term-structure SPY '2023-06-23', '2023-06-30', '2023-07-07', '2023-07-14', '2023-07-21', '2023-07-28', '2023-08-04', '2023-08-18'
+
+$chains = $chains_spy
+
+chart-term-structure -chains $chains_spy
 
 
-chart-term-structure -chains $result_spy
+$chains_spy

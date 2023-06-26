@@ -142,11 +142,15 @@ function chart-term-structure ($symbol, $expirations, $chains)
 
     $regularMarketPrice = $chains[0].optionChain.result[0].quote.regularMarketPrice
     
-    $atm_strike = $chain[0].optionChain.result[0].options[0].calls | Select-Object strike, @{ Label = 'dist'; Expression = { [math]::Abs($_.strike - $regularMarketPrice) } } | Sort-Object dist | Select-Object -First 1 | % strike
-        
+    # $atm_strike = $chains[0].optionChain.result[0].options[0].calls | Select-Object strike, @{ Label = 'dist'; Expression = { [math]::Abs($_.strike - $regularMarketPrice) } } | Sort-Object dist | Select-Object -First 1 | % strike
+    
+    # $chain = $chains[6]
+
     # ----------------------------------------------------------------------
     $atm_calls = foreach ($chain in $chains)
     {
+        $atm_strike = $chain.optionChain.result[0].options[0].calls | Select-Object strike, @{ Label = 'dist'; Expression = { [math]::Abs($_.strike - $regularMarketPrice) } } | Sort-Object dist | Select-Object -First 1 | % strike
+              
         # $chain[0].optionChain.result[0].options[0].calls | ? strike -GE $regularMarketPrice | Select-Object -First 1
 
         $chain[0].optionChain.result[0].options[0].calls | ? strike -EQ $atm_strike | Select-Object -First 1
@@ -156,6 +160,8 @@ function chart-term-structure ($symbol, $expirations, $chains)
 
     $atm_puts = foreach ($chain in $chains)
     {
+        $atm_strike = $chain.optionChain.result[0].options[0].puts | Select-Object strike, @{ Label = 'dist'; Expression = { [math]::Abs($_.strike - $regularMarketPrice) } } | Sort-Object dist | Select-Object -First 1 | % strike
+
         $chain[0].optionChain.result[0].options[0].puts | ? strike -EQ $atm_strike | Select-Object -First 1
     }
     # ----------------------------------------------------------------------
@@ -302,9 +308,11 @@ $result = get-options-chain SPY '2023-08-18'
 
 $chains_spy = .\term-structure-yfinance.ps1 SPY '2023-06-26', '2023-06-30', '2023-07-07', '2023-07-14', '2023-07-21', '2023-07-28', '2023-08-04', '2023-08-18'
 
+$chains = $chains_spy
 
 
-$chains_spy = chart-term-structure SPY '2023-06-23', '2023-06-30', '2023-07-07', '2023-07-14', '2023-07-21', '2023-07-28', '2023-08-04', '2023-08-18'
+
+# $chains_spy = chart-term-structure SPY '2023-06-23', '2023-06-30', '2023-07-07', '2023-07-14', '2023-07-21', '2023-07-28', '2023-08-04', '2023-08-18'
 
 $chains = $chains_spy
 
@@ -312,3 +320,6 @@ chart-term-structure -chains $chains_spy
 
 
 $chains_spy
+# ----------------------------------------------------------------------
+
+$chains_tlt = chart-term-structure TLT '2023-06-30', '2023-07-07', '2023-07-14', '2023-07-21', '2023-07-28', '2023-08-04', '2023-08-18'
